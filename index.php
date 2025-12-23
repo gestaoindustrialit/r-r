@@ -1,15 +1,16 @@
 <?php
 session_start();
 
-// Ensure storage directories exist
-$uploadDir = __DIR__ . '/uploads';
+// Ensure storage directory exists
 $dataDir = __DIR__ . '/data';
-if (!is_dir($uploadDir)) {
-    mkdir($uploadDir, 0777, true);
-}
 if (!is_dir($dataDir)) {
     mkdir($dataDir, 0777, true);
 }
+
+// Database bootstrap
+$dbPath = $dataDir . '/romantico.db';
+$db = new PDO('sqlite:' . $dbPath);
+$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 // Define route locations
 $locations = [
@@ -73,10 +74,34 @@ $locations = [
     'Castelo de Monte Mozinho'
 ];
 
+function ensureDatabase(PDO $db, array $locations): array
+{
+    $db->exec('CREATE TABLE IF NOT EXISTS locais (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL,
+        imagem TEXT NOT NULL,
+        data_visita TEXT
+    )');
+
+    $count = (int) $db->query('SELECT COUNT(*) FROM locais')->fetchColumn();
+    if ($count === 0) {
+        $stmt = $db->prepare('INSERT INTO locais (nome, imagem) VALUES (:nome, :imagem)');
+        foreach ($locations as $name) {
+            $stmt->execute([
+                ':nome' => $name,
+                ':imagem' => buildPlaceholder($name),
+            ]);
+        }
+    }
+
+    $rows = $db->query('SELECT id, nome, imagem, data_visita FROM locais ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+    return $rows ?: [];
+}
+
 // Utility to generate Google Maps link
 function buildMapLink(string $name): string
 {
-    $query = urlencode($name . ' Rota do Românico');
+    $query = urlencode($name . ' Rota do Romântico');
     return "https://www.google.com/maps/search/?api=1&query={$query}";
 }
 
@@ -103,21 +128,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['action']) && $_GET['ac
         exit;
     }
 
-    $visitsFile = $dataDir . '/visits.json';
-    file_put_contents($visitsFile, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    ensureDatabase($db, $locations);
+    $db->beginTransaction();
+    $stmt = $db->prepare('UPDATE locais SET data_visita = :data WHERE id = :id');
+    foreach ($payload as $key => $date) {
+        if (!preg_match('/^loc_(\d+)$/', $key, $matches)) {
+            continue;
+        }
+        $id = (int) $matches[1];
+        $stmt->execute([
+            ':data' => $date ?: null,
+            ':id' => $id,
+        ]);
+    }
+    $db->commit();
+
     echo json_encode(['status' => 'ok']);
     exit;
 }
 
-// Load saved visits for UI
-$visitsFile = $dataDir . '/visits.json';
+// Load saved visits and locations
+$locationsData = ensureDatabase($db, $locations);
 $savedVisits = [];
-if (file_exists($visitsFile)) {
-    $content = file_get_contents($visitsFile);
-    $decoded = json_decode($content, true);
-    if (is_array($decoded)) {
-        $savedVisits = $decoded;
-    }
+foreach ($locationsData as $row) {
+    $savedVisits['loc_' . $row['id']] = $row['data_visita'] ?? '';
 }
 
 // Handle login form
@@ -126,36 +160,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
     $pin = $_POST['pin'] ?? '';
     if ($pin !== '2002') {
         $loginError = 'PIN incorreto. Use 2002.';
-    } elseif (!isset($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
-        $loginError = 'Envie uma foto de entrada válida.';
     } else {
-        $fileInfo = pathinfo($_FILES['photo']['name']);
-        $extension = strtolower($fileInfo['extension'] ?? '');
-        $allowed = ['jpg', 'jpeg', 'png', 'gif'];
-        if (!in_array($extension, $allowed, true)) {
-            $loginError = 'Formato de imagem inválido.';
-        } else {
-            $targetName = uniqid('entrada_', true) . '.' . $extension;
-            $targetPath = $uploadDir . '/' . $targetName;
-            if (!move_uploaded_file($_FILES['photo']['tmp_name'], $targetPath)) {
-                $loginError = 'Não foi possível guardar a imagem.';
-            } else {
-                $_SESSION['authenticated'] = true;
-                $_SESSION['entry_photo'] = 'uploads/' . $targetName;
-            }
-        }
+        $_SESSION['authenticated'] = true;
     }
 }
 
 $isAuthenticated = !empty($_SESSION['authenticated']);
-$entryPhoto = $_SESSION['entry_photo'] ?? null;
 ?>
 <!DOCTYPE html>
 <html lang="pt-PT">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Rota do Românico - Diário de Visitas</title>
+    <title>Rota do Romântico - Diário de Visitas</title>
     <style>
         :root {
             --primary: #6b3c8f;
@@ -178,6 +195,22 @@ $entryPhoto = $_SESSION['entry_photo'] ?? null;
             padding: 24px;
             text-align: center;
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            position: relative;
+            overflow: hidden;
+        }
+        header .hero {
+            margin: 18px auto 0;
+            max-width: 960px;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            border: 3px solid rgba(255,255,255,0.6);
+        }
+        header .hero img {
+            width: 100%;
+            display: block;
+            height: 260px;
+            object-fit: cover;
         }
         main { padding: 24px; max-width: 1200px; margin: auto; }
         .card {
@@ -255,21 +288,33 @@ $entryPhoto = $_SESSION['entry_photo'] ?? null;
             align-items: center;
             flex-wrap: wrap;
         }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        @media print {
+            body { background: #fff; }
+            header, #saveStatus, #saveBtn, #printBtn, .auth-summary button { display: none; }
+            main { padding: 0; }
+            .card { box-shadow: none; border: none; }
+            .location-card { page-break-inside: avoid; }
+        }
     </style>
 </head>
 <body>
 <header>
-    <h1>Diário da Rota do Românico</h1>
-    <p>Autentique-se com a foto de entrada e PIN 2002 para registar visitas.</p>
+    <h1>Diário da Rota do Romântico</h1>
+    <p>Veja a foto de abertura, introduza o PIN 2002 e registe cada visita.</p>
+    <div class="hero">
+        <img src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=1600&q=80" alt="Rota do Romântico" />
+    </div>
 </header>
 <main>
     <?php if (!$isAuthenticated): ?>
         <section class="card">
             <h2>Entrada</h2>
-            <form class="login-form" method="POST" enctype="multipart/form-data">
-                <label for="photo">Foto de entrada</label>
-                <input id="photo" name="photo" type="file" accept="image/*" required />
-
+            <form class="login-form" method="POST">
                 <label for="pin">PIN de acesso</label>
                 <input id="pin" name="pin" type="password" inputmode="numeric" placeholder="2002" required />
 
@@ -283,13 +328,14 @@ $entryPhoto = $_SESSION['entry_photo'] ?? null;
     <?php else: ?>
         <section class="card">
             <div class="auth-summary">
-                <?php if ($entryPhoto): ?>
-                    <img src="<?= htmlspecialchars($entryPhoto, ENT_QUOTES, 'UTF-8'); ?>" alt="Foto de entrada" class="entry-photo" />
-                <?php endif; ?>
                 <div>
                     <h2>Bem-vindo(a)</h2>
-                    <p>PIN correto e foto registada. Preencha a data de visita de cada local e clique em "Guardar visitas".</p>
-                    <button id="saveBtn">Guardar visitas</button>
+                    <p>PIN correto. Preencha a data de visita de cada local, guarde e imprima o registo com uma foto de cada local.</p>
+                    <div class="actions">
+                        <button id="saveBtn">Guardar visitas</button>
+                        <button id="printBtn" type="button">Imprimir fotos</button>
+                        <a href="logout.php" class="map-link" style="align-self:center;">Terminar sessão</a>
+                    </div>
                     <div id="saveStatus" class="status" style="display:none"></div>
                 </div>
             </div>
@@ -298,10 +344,11 @@ $entryPhoto = $_SESSION['entry_photo'] ?? null;
         <section class="card">
             <h2>Locais da rota (58)</h2>
             <div class="grid">
-                <?php foreach ($locations as $index => $name):
-                    $id = 'loc_' . $index;
+                <?php foreach ($locationsData as $row):
+                    $id = 'loc_' . $row['id'];
+                    $name = $row['nome'];
                     $map = buildMapLink($name);
-                    $img = buildPlaceholder($name);
+                    $img = $row['imagem'];
                     $saved = $savedVisits[$id] ?? '';
                     ?>
                     <article class="location-card" data-id="<?= htmlspecialchars($id, ENT_QUOTES, 'UTF-8'); ?>">
@@ -321,6 +368,7 @@ $entryPhoto = $_SESSION['entry_photo'] ?? null;
 <script>
     const saveBtn = document.getElementById('saveBtn');
     const saveStatus = document.getElementById('saveStatus');
+    const printBtn = document.getElementById('printBtn');
 
     function showStatus(message, type = '') {
         if (!saveStatus) return;
@@ -362,6 +410,10 @@ $entryPhoto = $_SESSION['entry_photo'] ?? null;
 
     if (saveBtn) {
         saveBtn.addEventListener('click', saveVisits);
+    }
+
+    if (printBtn) {
+        printBtn.addEventListener('click', () => window.print());
     }
 </script>
 </body>
