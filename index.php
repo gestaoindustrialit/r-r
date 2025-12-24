@@ -74,6 +74,91 @@ $locations = [
     'Castelo de Monte Mozinho'
 ];
 
+/**
+ * ORDEM = NUMERAÇÃO DAS FOTOS
+ * photos/01.jpg => Mosteiro do Salvador de Travanca
+ * photos/02.jpg => Mosteiro de São Martinho de Mancelos
+ * ...
+ * photos/58.jpg => (pendente)
+ */
+$locations = [
+    // 01 - 10
+    'Mosteiro do Salvador de Travanca',                         // 01
+    'Mosteiro de São Martinho de Mancelos',                     // 02
+    'Mosteiro do Salvador de Freixo de Baixo',                  // 03
+    'Igreja de Santa Maria de Jazente',                         // 04
+    'Ponte de Fundo de Rua',                                    // 05
+    'Igreja de Santa Maria de Gondar',                          // 06
+    'Igreja do Salvador de Lufrei',                             // 07
+    'Igreja do Salvador de Real',                               // 08
+    'Igreja de Santo André de Telões',                          // 09
+    'Igreja de São João Baptista de Gatão',                     // 10
+
+    // 11 - 20
+    'Mosteiro de Santo André de Ancede',                        // 11
+    'Ponte de Esmoriz',                                         // 12
+    'Igreja de São Tiago de Valadares',                         // 13
+    'Marmoiral de Sobrado',                                     // 14
+    'Castelo de Arnoia',                                        // 15
+    'Igreja do Salvador de Ribas',                              // 16
+    'Igreja do Salvador de Fervença',                           // 17
+    'Igreja de Santa Maria de Veade',                           // 18
+    'Igreja de São Cristóvão de Nogueira',                      // 19
+    'Igreja de Santa Maria Maior de Tarouquela',                // 20
+
+    // 21 - 30
+    'Igreja de Nossa Senhora da Natividade de Escamarão',       // 21
+    'Mosteiro de Santa Maria de Pombeiro',                      // 22
+    'Igreja de São Vicente de Sousa',                           // 23
+    'Igreja do Salvador de Unhão',                              // 24
+    'Igreja de Santa Maria de Airães',                          // 25
+    'Igreja de São Mamede de Vila Verde',                       // 26
+    'Torre de Vilar',                                           // 27
+    'Ponte da Veiga',                                           // 28
+    'Ponte de Espindo',                                         // 29
+    'Ponte de Vilela',                                          // 30
+
+    // 31 - 40
+    'Igreja de Santa Maria de Meinedo',                         // 31
+    'Igreja do Salvador de Aveleda',                            // 32
+    'Ponte do Arco',                                            // 33
+    'Igreja do Salvador de Tabuado',                            // 34
+    'Igreja de São Martinho de Soalhães',                       // 35
+    'Igreja de São Nicolau de Canaveses',                       // 36
+    'Igreja de Santa Maria de Sobretâmega',                     // 37
+    'Igreja de Santo Isidoro de Canaveses',                     // 38
+    'Igreja de Santo André de Vila Boa de Quires',              // 39
+    'Mosteiro de Santa Maria de Vila Boa do Bispo',             // 40
+
+    // 41 - 44
+    'Memorial de Alpendorada',                                  // 41
+    'Capela da Senhora da Livração de Fandinhães',              // 42
+    'Mosteiro de São Pedro de Ferreira',                        // 43
+    'Torre do Castelo de Aguiar de Sousa',                      // 44
+
+    // 45 - 58 (PENDENTES) — substitui quando enviares o resto da lista oficial
+    'Mosteiro de Paço de Sousa',                                // 45
+    'Memorial da Ermida',                                       // 46
+    'Igreja Matriz de Abragão',                                 // 47
+    'Igreja de São Gens de Boelhe',                             // 48
+    'Igreja do Salvador de Cabeça Santa',                       // 49
+    'Igreja de São Miguel de Entre-os-Rios',                    // 50
+    'Torre dos Alcoforados',                                    // 51
+    'Capela da Senhora da Piedade da Quintã',                   // 52
+    'Igreja de São Pedro de Cete',                              // 53
+    'Ermida da Nossa Senhora do Vale',                          // 54
+    'Ponte da Panchorra',                                       // 55
+    'Mosteiro de Santa Maria de Cárquere',                      // 56
+    'Igreja de São Martinho de Mouros',                         // 57
+    'Igreja de Santa Maria de Barrô',     
+];
+
+function buildLocalImageByPos(int $pos): string
+{
+    // pos começa em 1
+    return 'photos/' . str_pad((string)$pos, 2, '0', STR_PAD_LEFT) . '.jpg';
+}
+
 function ensureDatabase(PDO $db, array $locations): array
 {
     $db->exec('CREATE TABLE IF NOT EXISTS locais (
