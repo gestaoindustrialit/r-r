@@ -102,19 +102,40 @@ function ensureDatabase(PDO $db, array $locations): array
     $updateImageOnly = $db->prepare('UPDATE locais SET imagem = :imagem WHERE id = :id');
     $updateLinkOnly = $db->prepare('UPDATE locais SET link = :link WHERE id = :id');
 
-    foreach ($locations as $index => $name) {
-        $id = $index + 1;
-        $imagem = buildPhotoPath($id);
-        $link = buildMapLink($name);
+    $desiredCounts = array_count_values($locations);
+    $existingCounts = [];
+    foreach ($existingById as $row) {
+        $currentName = trim((string) ($row['nome'] ?? ''));
+        if ($currentName !== '' && !preg_match('/^pendente/i', $currentName)) {
+            $existingCounts[$currentName] = ($existingCounts[$currentName] ?? 0) + 1;
+        }
+    }
 
+    $remainingNames = [];
+    foreach ($locations as $name) {
+        $currentCount = $existingCounts[$name] ?? 0;
+        $desiredCount = $desiredCounts[$name] ?? 0;
+        if ($currentCount < $desiredCount) {
+            $remainingNames[] = $name;
+            $existingCounts[$name] = $currentCount + 1;
+        }
+    }
+
+    for ($id = 1; $id <= $maxId; $id++) {
+        $imagem = buildPhotoPath($id);
         if (!isset($existingById[$id])) {
             $insert->execute([
                 ':id' => $id,
-                ':nome' => $name,
+                ':nome' => 'PENDENTE ' . $id,
                 ':imagem' => $imagem,
-                ':link' => $link,
+                ':link' => '',
             ]);
-            continue;
+            $existingById[$id] = [
+                'id' => $id,
+                'nome' => 'PENDENTE ' . $id,
+                'imagem' => $imagem,
+                'link' => '',
+            ];
         }
 
         $current = $existingById[$id];
@@ -122,39 +143,43 @@ function ensureDatabase(PDO $db, array $locations): array
         $currentLink = trim((string) ($current['link'] ?? ''));
         $currentImage = trim((string) ($current['imagem'] ?? ''));
         $isPending = $currentName === '' || preg_match('/^pendente/i', $currentName);
-        $isPlaceholderImage = $currentImage === '' || str_contains($currentImage, 'via.placeholder.com');
+        $isPlaceholderImage = $currentImage === '' || strpos($currentImage, 'via.placeholder.com') !== false;
 
         if ($isPending) {
-            $updateAll->execute([
-                ':id' => $id,
-                ':nome' => $name,
-                ':imagem' => $imagem,
-                ':link' => $link,
-            ]);
-        } else {
-            if ($currentLink === '' && $currentImage === '') {
-                $updateLinkImage->execute([
+            $name = array_shift($remainingNames);
+            if ($name !== null) {
+                $updateAll->execute([
                     ':id' => $id,
+                    ':nome' => $name,
                     ':imagem' => $imagem,
-                    ':link' => $link,
-                ]);
-            } elseif ($currentLink === '' && $isPlaceholderImage) {
-                $updateLinkImage->execute([
-                    ':id' => $id,
-                    ':imagem' => $imagem,
-                    ':link' => $link,
-                ]);
-            } elseif ($currentLink === '') {
-                $updateLinkOnly->execute([
-                    ':id' => $id,
-                    ':link' => $link,
-                ]);
-            } elseif ($isPlaceholderImage) {
-                $updateImageOnly->execute([
-                    ':id' => $id,
-                    ':imagem' => $imagem,
+                    ':link' => buildMapLink($name),
                 ]);
             }
+            continue;
+        }
+
+        if ($currentLink === '' && $currentImage === '') {
+            $updateLinkImage->execute([
+                ':id' => $id,
+                ':imagem' => $imagem,
+                ':link' => buildMapLink($currentName),
+            ]);
+        } elseif ($currentLink === '' && $isPlaceholderImage) {
+            $updateLinkImage->execute([
+                ':id' => $id,
+                ':imagem' => $imagem,
+                ':link' => buildMapLink($currentName),
+            ]);
+        } elseif ($currentLink === '') {
+            $updateLinkOnly->execute([
+                ':id' => $id,
+                ':link' => buildMapLink($currentName),
+            ]);
+        } elseif ($isPlaceholderImage) {
+            $updateImageOnly->execute([
+                ':id' => $id,
+                ':imagem' => $imagem,
+            ]);
         }
     }
 
