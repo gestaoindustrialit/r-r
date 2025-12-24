@@ -89,35 +89,62 @@ function ensureDatabase(PDO $db, array $locations): array
         $db->exec('ALTER TABLE locais ADD COLUMN link TEXT NOT NULL DEFAULT ""');
     }
 
-    $existingIds = $db->query('SELECT id FROM locais')->fetchAll(PDO::FETCH_COLUMN, 0);
-    $existingIds = array_map('intval', $existingIds ?: []);
-    $existingLookup = array_fill_keys($existingIds, true);
+    $maxId = count($locations);
+    $existingRows = $db->query('SELECT id, nome, imagem, link FROM locais')->fetchAll(PDO::FETCH_ASSOC);
+    $existingById = [];
+    foreach ($existingRows as $row) {
+        $existingById[(int) $row['id']] = $row;
+    }
 
     $insert = $db->prepare('INSERT INTO locais (id, nome, imagem, link) VALUES (:id, :nome, :imagem, :link)');
-    $update = $db->prepare('UPDATE locais SET nome = :nome, imagem = :imagem, link = :link WHERE id = :id');
+    $updateAll = $db->prepare('UPDATE locais SET nome = :nome, imagem = :imagem, link = :link WHERE id = :id');
+    $updateLinkImage = $db->prepare('UPDATE locais SET imagem = :imagem, link = :link WHERE id = :id');
+    $updateLinkOnly = $db->prepare('UPDATE locais SET link = :link WHERE id = :id');
 
     foreach ($locations as $index => $name) {
         $id = $index + 1;
         $imagem = buildPlaceholder($name);
         $link = buildMapLink($name);
-        if (isset($existingLookup[$id])) {
-            $update->execute([
-                ':id' => $id,
-                ':nome' => $name,
-                ':imagem' => $imagem,
-                ':link' => $link,
-            ]);
-        } else {
+
+        if (!isset($existingById[$id])) {
             $insert->execute([
                 ':id' => $id,
                 ':nome' => $name,
                 ':imagem' => $imagem,
                 ':link' => $link,
             ]);
+            continue;
+        }
+
+        $current = $existingById[$id];
+        $currentName = trim((string) ($current['nome'] ?? ''));
+        $currentLink = trim((string) ($current['link'] ?? ''));
+        $currentImage = trim((string) ($current['imagem'] ?? ''));
+        $isPending = $currentName === '' || preg_match('/^pendente/i', $currentName);
+
+        if ($isPending) {
+            $updateAll->execute([
+                ':id' => $id,
+                ':nome' => $name,
+                ':imagem' => $imagem,
+                ':link' => $link,
+            ]);
+        } else {
+            if ($currentLink === '' && $currentImage === '') {
+                $updateLinkImage->execute([
+                    ':id' => $id,
+                    ':imagem' => $imagem,
+                    ':link' => $link,
+                ]);
+            } elseif ($currentLink === '') {
+                $updateLinkOnly->execute([
+                    ':id' => $id,
+                    ':link' => $link,
+                ]);
+            }
         }
     }
 
-    $maxId = count($locations);
     $stmt = $db->prepare('SELECT id, nome, imagem, link, data_visita FROM locais WHERE id <= :maxId ORDER BY id');
     $stmt->execute([':maxId' => $maxId]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
