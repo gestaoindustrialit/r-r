@@ -12,67 +12,90 @@ $dbPath = $dataDir . '/romantico.db';
 $db = new PDO('sqlite:' . $dbPath);
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-// Define route locations
+/**
+ * ORDEM = NUMERAÇÃO DAS FOTOS
+ * photos/01.jpg => Mosteiro do Salvador de Travanca
+ * photos/02.jpg => Mosteiro de São Martinho de Mancelos
+ * ...
+ * photos/58.jpg => (pendente)
+ */
 $locations = [
-    'Mosteiro de Santa Maria de Pombeiro',
-    'Mosteiro do Salvador de Travanca',
-    'Mosteiro de São Pedro de Ferreira',
-    'Mosteiro de Paço de Sousa',
-    'Mosteiro de Cête',
-    'Mosteiro do Salvador de Mancelos',
-    'Mosteiro de Vila Boa do Bispo',
-    'Mosteiro de Santa Maria de Arouca',
-    'Mosteiro de Santo André de Ancede',
-    'Mosteiro de Santa Maria de Pombeiro',
-    'Mosteiro do Salvador de Freixo de Baixo',
-    'Mosteiro de Bustelo',
-    'Igreja de São Pedro de Abragão',
-    'Igreja de São Pedro de Aboim',
-    'Igreja de São Vicente de Sousa',
-    'Igreja de São Gens de Boelhe',
-    'Igreja de Santa Maria de Airães',
-    'Igreja de São Miguel de Entre-os-Rios',
-    'Igreja de São Pedro de Rates',
-    'Igreja de São Salvador de Aveleda',
-    'Igreja de São Martinho de Soalhães',
-    'Igreja de São Tiago de Valadares',
-    'Igreja de São Mamede de Vila Verde',
-    'Igreja de São Martinho de Foz do Sousa',
-    'Igreja de Santa Maria de Lufrei',
-    'Igreja de São Pedro de Balsemão',
-    'Igreja de Santa Maria de Gondar',
-    'Igreja de São João Baptista de Gatão',
-    'Igreja de Santa Maria de Travanca',
-    'Igreja de São Tiago de Antas',
-    'Igreja de Santa Maria de Meinedo',
-    'Igreja de São Tiago de Telões',
-    'Igreja de Santa Maria de Gestaçô',
-    'Igreja de Santa Marinha de Vila Marim',
-    'Igreja de São Miguel de Bustelo',
-    'Igreja de São Mamede de Vila Chã',
-    'Igreja de São Clemente de Tarouquela',
-    'Igreja de Santa Maria de Vila Boa de Quires',
-    'Igreja de São Pedro de Tendais',
-    'Igreja de São Salvador de Ribas',
-    'Igreja de São Pedro de Castelões',
-    'Igreja de Santa Maria de Lardosa',
-    'Igreja de Santo André de Telões',
-    'Torre de Vilar',
-    'Torre de Alpendurada',
-    'Torre de Penafiel',
-    'Memorial da Ermida',
-    'Memorial de Sobrado',
-    'Memorial de Alpendurada',
-    'Memorial de Lordelo',
-    'Ponte de Espindo',
-    'Ponte de Esposende',
-    'Ponte do Arco de Sardoura',
-    'Ponte de Ucanha',
-    'Ponte de Soalhães',
-    'Ponte de Canavezes',
-    'Castelo de Arnoia',
-    'Castelo de Monte Mozinho'
+    // 01 - 10
+    'Mosteiro do Salvador de Travanca',                         // 01
+    'Mosteiro de São Martinho de Mancelos',                     // 02
+    'Mosteiro do Salvador de Freixo de Baixo',                  // 03
+    'Igreja de Santa Maria de Jazente',                         // 04
+    'Ponte de Fundo de Rua',                                    // 05
+    'Igreja de Santa Maria de Gondar',                          // 06
+    'Igreja do Salvador de Lufrei',                             // 07
+    'Igreja do Salvador de Real',                               // 08
+    'Igreja de Santo André de Telões',                          // 09
+    'Igreja de São João Baptista de Gatão',                     // 10
+
+    // 11 - 20
+    'Mosteiro de Santo André de Ancede',                        // 11
+    'Ponte de Esmoriz',                                         // 12
+    'Igreja de São Tiago de Valadares',                         // 13
+    'Marmoiral de Sobrado',                                     // 14
+    'Castelo de Arnoia',                                        // 15
+    'Igreja do Salvador de Ribas',                              // 16
+    'Igreja do Salvador de Fervença',                           // 17
+    'Igreja de Santa Maria de Veade',                           // 18
+    'Igreja de São Cristóvão de Nogueira',                      // 19
+    'Igreja de Santa Maria Maior de Tarouquela',                // 20
+
+    // 21 - 30
+    'Igreja de Nossa Senhora da Natividade de Escamarão',       // 21
+    'Mosteiro de Santa Maria de Pombeiro',                      // 22
+    'Igreja de São Vicente de Sousa',                           // 23
+    'Igreja do Salvador de Unhão',                              // 24
+    'Igreja de Santa Maria de Airães',                          // 25
+    'Igreja de São Mamede de Vila Verde',                       // 26
+    'Torre de Vilar',                                           // 27
+    'Ponte da Veiga',                                           // 28
+    'Ponte de Espindo',                                         // 29
+    'Ponte de Vilela',                                          // 30
+
+    // 31 - 40
+    'Igreja de Santa Maria de Meinedo',                         // 31
+    'Igreja do Salvador de Aveleda',                            // 32
+    'Ponte do Arco',                                            // 33
+    'Igreja do Salvador de Tabuado',                            // 34
+    'Igreja de São Martinho de Soalhães',                       // 35
+    'Igreja de São Nicolau de Canaveses',                       // 36
+    'Igreja de Santa Maria de Sobretâmega',                     // 37
+    'Igreja de Santo Isidoro de Canaveses',                     // 38
+    'Igreja de Santo André de Vila Boa de Quires',              // 39
+    'Mosteiro de Santa Maria de Vila Boa do Bispo',             // 40
+
+    // 41 - 44
+    'Memorial de Alpendorada',                                  // 41
+    'Capela da Senhora da Livração de Fandinhães',              // 42
+    'Mosteiro de São Pedro de Ferreira',                        // 43
+    'Torre do Castelo de Aguiar de Sousa',                      // 44
+
+    // 45 - 58 (PENDENTES) — substitui quando enviares o resto da lista oficial
+    'Mosteiro de Paço de Sousa',                                // 45
+    'Memorial da Ermida',                                       // 46
+    'Igreja Matriz de Abragão',                                 // 47
+    'Igreja de São Gens de Boelhe',                             // 48
+    'Igreja do Salvador de Cabeça Santa',                       // 49
+    'Igreja de São Miguel de Entre-os-Rios',                    // 50
+    'Torre dos Alcoforados',                                    // 51
+    'Capela da Senhora da Piedade da Quintã',                   // 52
+    'Igreja de São Pedro de Cete',                              // 53
+    'Ermida da Nossa Senhora do Vale',                          // 54
+    'Ponte da Panchorra',                                       // 55
+    'Mosteiro de Santa Maria de Cárquere',                      // 56
+    'Igreja de São Martinho de Mouros',                         // 57
+    'Igreja de Santa Maria de Barrô',     
 ];
+
+function buildLocalImageByPos(int $pos): string
+{
+    // pos começa em 1
+    return 'photos/' . str_pad((string)$pos, 2, '0', STR_PAD_LEFT) . '.jpg';
+}
 
 function ensureDatabase(PDO $db, array $locations): array
 {
@@ -83,15 +106,58 @@ function ensureDatabase(PDO $db, array $locations): array
         data_visita TEXT
     )');
 
-    $count = (int) $db->query('SELECT COUNT(*) FROM locais')->fetchColumn();
-    if ($count === 0) {
-        $stmt = $db->prepare('INSERT INTO locais (nome, imagem) VALUES (:nome, :imagem)');
+    // Lê o estado atual
+    $existing = $db->query('SELECT id, nome, imagem, data_visita FROM locais ORDER BY id')->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    $needReseed = false;
+
+    if (count($existing) !== count($locations)) {
+        $needReseed = true;
+    } else {
+        // se o primeiro nome não bater, é porque a ordem foi alterada
+        $firstDb = (string)($existing[0]['nome'] ?? '');
+        $firstArr = (string)($locations[0] ?? '');
+        if ($firstDb !== $firstArr) $needReseed = true;
+    }
+
+    if ($needReseed) {
+        // Preservar datas por nome (se possível)
+        $byNameDate = [];
+        foreach ($existing as $row) {
+            $nm = (string)($row['nome'] ?? '');
+            if ($nm !== '' && !empty($row['data_visita'])) {
+                $byNameDate[$nm] = $row['data_visita'];
+            }
+        }
+
+        $db->beginTransaction();
+        $db->exec('DELETE FROM locais');
+        // reset autoincrement (SQLite)
+        $db->exec("DELETE FROM sqlite_sequence WHERE name='locais'");
+
+        $stmt = $db->prepare('INSERT INTO locais (nome, imagem, data_visita) VALUES (:nome, :imagem, :data_visita)');
+        $pos = 1;
         foreach ($locations as $name) {
+            $name = (string)$name;
             $stmt->execute([
                 ':nome' => $name,
-                ':imagem' => buildPlaceholder($name),
+                ':imagem' => buildLocalImageByPos($pos),
+                ':data_visita' => $byNameDate[$name] ?? null,
             ]);
+            $pos++;
         }
+        $db->commit();
+    } else {
+        // Garantir que as imagens estão alinhadas com a numeração (caso tenhas DB antiga)
+        $db->beginTransaction();
+        $stmt = $db->prepare('UPDATE locais SET imagem = :img WHERE id = :id');
+        foreach ($existing as $row) {
+            $id = (int)$row['id'];
+            $expected = buildLocalImageByPos($id);
+            if (($row['imagem'] ?? '') !== $expected) {
+                $stmt->execute([':img' => $expected, ':id' => $id]);
+            }
+        }
+        $db->commit();
     }
 
     $rows = $db->query('SELECT id, nome, imagem, data_visita FROM locais ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
@@ -101,14 +167,8 @@ function ensureDatabase(PDO $db, array $locations): array
 // Utility to generate Google Maps link
 function buildMapLink(string $name): string
 {
-    $query = urlencode($name . ' Rota do Romântico');
+    $query = urlencode($name . ' Rota do Românico');
     return "https://www.google.com/maps/search/?api=1&query={$query}";
-}
-
-// Utility to generate placeholder image
-function buildPlaceholder(string $name): string
-{
-    return 'https://via.placeholder.com/320x200?text=' . urlencode($name);
 }
 
 // Handle saving visits
@@ -172,7 +232,7 @@ $isAuthenticated = !empty($_SESSION['authenticated']);
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Rota do Romântico - Diário de Visitas</title>
+    <title>Rota do Românico - Diário de Visitas</title>
     <style>
         :root {
             --primary: #6b3c8f;
@@ -304,10 +364,10 @@ $isAuthenticated = !empty($_SESSION['authenticated']);
 </head>
 <body>
 <header>
-    <h1>Diário da Rota do Romântico</h1>
+    <h1>Diário da Rota do Românico</h1>
     <p>Veja a foto de abertura, introduza o PIN 2002 e registe cada visita.</p>
     <div class="hero">
-        <img src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=1600&q=80" alt="Rota do Romântico" />
+        <img src="http://ricardo-pereira.com/r-r/uploads/rota.png" alt="Rota do Românico" />
     </div>
 </header>
 <main>
@@ -342,17 +402,21 @@ $isAuthenticated = !empty($_SESSION['authenticated']);
         </section>
 
         <section class="card">
-            <h2>Locais da rota (58)</h2>
+            <h2>Locais da rota (<?= count($locationsData) ?>)</h2>
             <div class="grid">
                 <?php foreach ($locationsData as $row):
                     $id = 'loc_' . $row['id'];
                     $name = $row['nome'];
                     $map = buildMapLink($name);
-                    $img = $row['imagem'];
+                    $img = $row['imagem']; // photos/01.jpg etc
                     $saved = $savedVisits[$id] ?? '';
                     ?>
                     <article class="location-card" data-id="<?= htmlspecialchars($id, ENT_QUOTES, 'UTF-8'); ?>">
-                        <img src="<?= htmlspecialchars($img, ENT_QUOTES, 'UTF-8'); ?>" alt="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" />
+                        <img
+                            src="<?= htmlspecialchars($img, ENT_QUOTES, 'UTF-8'); ?>"
+                            alt="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>"
+                            onerror="this.onerror=null;this.src='photos/placeholder.jpg';"
+                        />
                         <div class="content">
                             <h3><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?></h3>
                             <a class="map-link" href="<?= htmlspecialchars($map, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener">Ver no Google Maps</a>
