@@ -99,11 +99,12 @@ function ensureDatabase(PDO $db, array $locations): array
     $insert = $db->prepare('INSERT INTO locais (id, nome, imagem, link) VALUES (:id, :nome, :imagem, :link)');
     $updateAll = $db->prepare('UPDATE locais SET nome = :nome, imagem = :imagem, link = :link WHERE id = :id');
     $updateLinkImage = $db->prepare('UPDATE locais SET imagem = :imagem, link = :link WHERE id = :id');
+    $updateImageOnly = $db->prepare('UPDATE locais SET imagem = :imagem WHERE id = :id');
     $updateLinkOnly = $db->prepare('UPDATE locais SET link = :link WHERE id = :id');
 
     foreach ($locations as $index => $name) {
         $id = $index + 1;
-        $imagem = buildPlaceholder($name);
+        $imagem = buildPhotoPath($id);
         $link = buildMapLink($name);
 
         if (!isset($existingById[$id])) {
@@ -121,6 +122,7 @@ function ensureDatabase(PDO $db, array $locations): array
         $currentLink = trim((string) ($current['link'] ?? ''));
         $currentImage = trim((string) ($current['imagem'] ?? ''));
         $isPending = $currentName === '' || preg_match('/^pendente/i', $currentName);
+        $isPlaceholderImage = $currentImage === '' || str_contains($currentImage, 'via.placeholder.com');
 
         if ($isPending) {
             $updateAll->execute([
@@ -136,10 +138,21 @@ function ensureDatabase(PDO $db, array $locations): array
                     ':imagem' => $imagem,
                     ':link' => $link,
                 ]);
+            } elseif ($currentLink === '' && $isPlaceholderImage) {
+                $updateLinkImage->execute([
+                    ':id' => $id,
+                    ':imagem' => $imagem,
+                    ':link' => $link,
+                ]);
             } elseif ($currentLink === '') {
                 $updateLinkOnly->execute([
                     ':id' => $id,
                     ':link' => $link,
+                ]);
+            } elseif ($isPlaceholderImage) {
+                $updateImageOnly->execute([
+                    ':id' => $id,
+                    ':imagem' => $imagem,
                 ]);
             }
         }
@@ -158,10 +171,10 @@ function buildMapLink(string $name): string
     return "https://www.google.com/maps/search/?api=1&query={$query}";
 }
 
-// Utility to generate placeholder image
-function buildPlaceholder(string $name): string
+// Utility to generate photo path
+function buildPhotoPath(int $id): string
 {
-    return 'https://via.placeholder.com/320x200?text=' . urlencode($name);
+    return sprintf('photos/%02d.jpg', $id);
 }
 
 // Handle saving visits
