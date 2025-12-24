@@ -12,6 +12,68 @@ $dbPath = $dataDir . '/romantico.db';
 $db = new PDO('sqlite:' . $dbPath);
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+// Define route locations
+$locations = [
+    'Mosteiro de Santa Maria de Pombeiro',
+    'Mosteiro do Salvador de Travanca',
+    'Mosteiro de São Pedro de Ferreira',
+    'Mosteiro de Paço de Sousa',
+    'Mosteiro de Cête',
+    'Mosteiro do Salvador de Mancelos',
+    'Mosteiro de Vila Boa do Bispo',
+    'Mosteiro de Santa Maria de Arouca',
+    'Mosteiro de Santo André de Ancede',
+    'Mosteiro de Santa Maria de Pombeiro',
+    'Mosteiro do Salvador de Freixo de Baixo',
+    'Mosteiro de Bustelo',
+    'Igreja de São Pedro de Abragão',
+    'Igreja de São Pedro de Aboim',
+    'Igreja de São Vicente de Sousa',
+    'Igreja de São Gens de Boelhe',
+    'Igreja de Santa Maria de Airães',
+    'Igreja de São Miguel de Entre-os-Rios',
+    'Igreja de São Pedro de Rates',
+    'Igreja de São Salvador de Aveleda',
+    'Igreja de São Martinho de Soalhães',
+    'Igreja de São Tiago de Valadares',
+    'Igreja de São Mamede de Vila Verde',
+    'Igreja de São Martinho de Foz do Sousa',
+    'Igreja de Santa Maria de Lufrei',
+    'Igreja de São Pedro de Balsemão',
+    'Igreja de Santa Maria de Gondar',
+    'Igreja de São João Baptista de Gatão',
+    'Igreja de Santa Maria de Travanca',
+    'Igreja de São Tiago de Antas',
+    'Igreja de Santa Maria de Meinedo',
+    'Igreja de São Tiago de Telões',
+    'Igreja de Santa Maria de Gestaçô',
+    'Igreja de Santa Marinha de Vila Marim',
+    'Igreja de São Miguel de Bustelo',
+    'Igreja de São Mamede de Vila Chã',
+    'Igreja de São Clemente de Tarouquela',
+    'Igreja de Santa Maria de Vila Boa de Quires',
+    'Igreja de São Pedro de Tendais',
+    'Igreja de São Salvador de Ribas',
+    'Igreja de São Pedro de Castelões',
+    'Igreja de Santa Maria de Lardosa',
+    'Igreja de Santo André de Telões',
+    'Torre de Vilar',
+    'Torre de Alpendurada',
+    'Torre de Penafiel',
+    'Memorial da Ermida',
+    'Memorial de Sobrado',
+    'Memorial de Alpendurada',
+    'Memorial de Lordelo',
+    'Ponte de Espindo',
+    'Ponte de Esposende',
+    'Ponte do Arco de Sardoura',
+    'Ponte de Ucanha',
+    'Ponte de Soalhães',
+    'Ponte de Canavezes',
+    'Castelo de Arnoia',
+    'Castelo de Monte Mozinho'
+];
+
 /**
  * ORDEM = NUMERAÇÃO DAS FOTOS
  * photos/01.jpg => Mosteiro do Salvador de Travanca
@@ -103,72 +165,57 @@ function ensureDatabase(PDO $db, array $locations): array
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
         imagem TEXT NOT NULL,
+        link TEXT NOT NULL DEFAULT "",
         data_visita TEXT
     )');
 
-    // Lê o estado atual
-    $existing = $db->query('SELECT id, nome, imagem, data_visita FROM locais ORDER BY id')->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    $needReseed = false;
-
-    if (count($existing) !== count($locations)) {
-        $needReseed = true;
-    } else {
-        // se o primeiro nome não bater, é porque a ordem foi alterada
-        $firstDb = (string)($existing[0]['nome'] ?? '');
-        $firstArr = (string)($locations[0] ?? '');
-        if ($firstDb !== $firstArr) $needReseed = true;
+    $columns = $db->query('PRAGMA table_info(locais)')->fetchAll(PDO::FETCH_COLUMN, 1);
+    if (!in_array('link', $columns, true)) {
+        $db->exec('ALTER TABLE locais ADD COLUMN link TEXT NOT NULL DEFAULT ""');
     }
 
-    if ($needReseed) {
-        // Preservar datas por nome (se possível)
-        $byNameDate = [];
-        foreach ($existing as $row) {
-            $nm = (string)($row['nome'] ?? '');
-            if ($nm !== '' && !empty($row['data_visita'])) {
-                $byNameDate[$nm] = $row['data_visita'];
-            }
-        }
-
-        $db->beginTransaction();
-        $db->exec('DELETE FROM locais');
-        // reset autoincrement (SQLite)
-        $db->exec("DELETE FROM sqlite_sequence WHERE name='locais'");
-
-        $stmt = $db->prepare('INSERT INTO locais (nome, imagem, data_visita) VALUES (:nome, :imagem, :data_visita)');
-        $pos = 1;
-        foreach ($locations as $name) {
-            $name = (string)$name;
-            $stmt->execute([
+    $existing = $db->query('SELECT nome, COUNT(*) as total FROM locais GROUP BY nome')->fetchAll(PDO::FETCH_KEY_PAIR);
+    $insert = $db->prepare('INSERT INTO locais (nome, imagem, link) VALUES (:nome, :imagem, :link)');
+    $updateLink = $db->prepare('UPDATE locais SET link = :link WHERE id = :id');
+    $desiredCounts = [];
+    foreach ($locations as $name) {
+        $desiredCounts[$name] = ($desiredCounts[$name] ?? 0) + 1;
+        $currentCount = (int) ($existing[$name] ?? 0);
+        if ($currentCount < $desiredCounts[$name]) {
+            $insert->execute([
                 ':nome' => $name,
-                ':imagem' => buildLocalImageByPos($pos),
-                ':data_visita' => $byNameDate[$name] ?? null,
+                ':imagem' => buildPlaceholder($name),
+                ':link' => buildMapLink($name),
             ]);
-            $pos++;
+            $existing[$name] = $currentCount + 1;
         }
-        $db->commit();
-    } else {
-        // Garantir que as imagens estão alinhadas com a numeração (caso tenhas DB antiga)
-        $db->beginTransaction();
-        $stmt = $db->prepare('UPDATE locais SET imagem = :img WHERE id = :id');
-        foreach ($existing as $row) {
-            $id = (int)$row['id'];
-            $expected = buildLocalImageByPos($id);
-            if (($row['imagem'] ?? '') !== $expected) {
-                $stmt->execute([':img' => $expected, ':id' => $id]);
-            }
-        }
-        $db->commit();
     }
 
-    $rows = $db->query('SELECT id, nome, imagem, data_visita FROM locais ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $db->query('SELECT id, nome, imagem, link, data_visita FROM locais ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
+        if (empty($row['link'])) {
+            $updateLink->execute([
+                ':link' => buildMapLink($row['nome']),
+                ':id' => $row['id'],
+            ]);
+        }
+    }
+
+    $rows = $db->query('SELECT id, nome, imagem, link, data_visita FROM locais ORDER BY id')->fetchAll(PDO::FETCH_ASSOC);
     return $rows ?: [];
 }
 
 // Utility to generate Google Maps link
 function buildMapLink(string $name): string
 {
-    $query = urlencode($name . ' Rota do Românico');
+    $query = urlencode($name . ' Rota do Romântico');
     return "https://www.google.com/maps/search/?api=1&query={$query}";
+}
+
+// Utility to generate placeholder image
+function buildPlaceholder(string $name): string
+{
+    return 'https://via.placeholder.com/320x200?text=' . urlencode($name);
 }
 
 // Handle saving visits
@@ -232,7 +279,7 @@ $isAuthenticated = !empty($_SESSION['authenticated']);
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Rota do Românico - Diário de Visitas</title>
+    <title>Rota do Romântico - Diário de Visitas</title>
     <style>
         :root {
             --primary: #6b3c8f;
@@ -364,10 +411,10 @@ $isAuthenticated = !empty($_SESSION['authenticated']);
 </head>
 <body>
 <header>
-    <h1>Diário da Rota do Românico</h1>
+    <h1>Diário da Rota do Romântico</h1>
     <p>Veja a foto de abertura, introduza o PIN 2002 e registe cada visita.</p>
     <div class="hero">
-        <img src="http://ricardo-pereira.com/r-r/uploads/rota.png" alt="Rota do Românico" />
+        <img src="https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=1600&q=80" alt="Rota do Romântico" />
     </div>
 </header>
 <main>
@@ -402,21 +449,17 @@ $isAuthenticated = !empty($_SESSION['authenticated']);
         </section>
 
         <section class="card">
-            <h2>Locais da rota (<?= count($locationsData) ?>)</h2>
+            <h2>Locais da rota (58)</h2>
             <div class="grid">
                 <?php foreach ($locationsData as $row):
                     $id = 'loc_' . $row['id'];
                     $name = $row['nome'];
-                    $map = buildMapLink($name);
-                    $img = $row['imagem']; // photos/01.jpg etc
+                    $map = $row['link'] ?: buildMapLink($name);
+                    $img = $row['imagem'];
                     $saved = $savedVisits[$id] ?? '';
                     ?>
                     <article class="location-card" data-id="<?= htmlspecialchars($id, ENT_QUOTES, 'UTF-8'); ?>">
-                        <img
-                            src="<?= htmlspecialchars($img, ENT_QUOTES, 'UTF-8'); ?>"
-                            alt="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>"
-                            onerror="this.onerror=null;this.src='photos/placeholder.jpg';"
-                        />
+                        <img src="<?= htmlspecialchars($img, ENT_QUOTES, 'UTF-8'); ?>" alt="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?>" />
                         <div class="content">
                             <h3><?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8'); ?></h3>
                             <a class="map-link" href="<?= htmlspecialchars($map, ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener">Ver no Google Maps</a>
